@@ -38,13 +38,28 @@ Automate YouTube Shorts creation with AI voice narration and background videos u
    - **Instance Type:** Free
 
 7. **Environment Variables** (Add these in Render):
+   
+   **Required Variables:**
    ```
    N8N_BASIC_AUTH_ACTIVE=true
-   N8N_BASIC_AUTH_USER=your_username
-   N8N_BASIC_AUTH_PASSWORD=your_secure_password
-   PEXELS_API_KEY=your_pexels_api_key
+   N8N_BASIC_AUTH_USER=admin
+   N8N_BASIC_AUTH_PASSWORD=YourSecurePassword123!
+   PEXELS_API_KEY=your_pexels_api_key_here
    WEBHOOK_URL=https://your-app-name.onrender.com
    ```
+   
+   **Optional Variables (Recommended):**
+   ```
+   GENERIC_TIMEZONE=Asia/Kolkata
+   EXECUTIONS_TIMEOUT=3600
+   N8N_CONCURRENCY_PRODUCTION_LIMIT=1
+   ```
+   
+   > **Get Your Pexels API Key:**
+   > 1. Go to https://www.pexels.com/api/
+   > 2. Sign up for free
+   > 3. Copy your API key
+   > 4. Paste it in Render's environment variables
 
 8. Click **Create Web Service**
 

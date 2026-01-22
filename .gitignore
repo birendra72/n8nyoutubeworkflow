@@ -29,6 +29,8 @@ Thumbs.db
 # Environment Variables
 .env
 .env.local
+.env.*.local
+*.env
 
 # IDEs
 .vscode/
