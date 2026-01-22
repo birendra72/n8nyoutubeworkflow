@@ -1,45 +1,65 @@
-# Start from a known Alpine-based n8n image
-# Use a specific version tag that's known to be Alpine-based
-FROM n8nio/n8n:1.17.1-alpine
+# Use latest stable Alpine as base (lightweight, low memory)
+FROM alpine:3.19
 
-# Switch to root user to install software
-USER root
+# Set environment variables for n8n
+ENV N8N_VERSION=latest \
+    NODE_ENV=production \
+    N8N_USER_FOLDER=/home/node/.n8n \
+    GENERIC_TIMEZONE=UTC
 
-# Install system dependencies for Alpine Linux
-# python3: Python runtime
-# py3-pip: Python package manager
-# ffmpeg: Video processing engine
-# git: For potential future extensions
-# bash: Shell for better script compatibility
+# Install system dependencies
+# - nodejs and npm: For running n8n
+# - python3, py3-pip: For our automation script
+# - ffmpeg: For video processing
+# - git, bash: For compatibility
+# - tini: For proper signal handling
 RUN apk add --update --no-cache \
+    nodejs \
+    npm \
     python3 \
     py3-pip \
     ffmpeg \
     git \
-    bash
+    bash \
+    tini \
+    ca-certificates
+
+# Create node user and directories
+RUN addgroup -g 1000 node && \
+    adduser -u 1000 -G node -s /bin/sh -D node && \
+    mkdir -p /home/node/.n8n /home/node/output /home/node/temp && \
+    chown -R node:node /home/node
+
+# Switch to node user
+USER node
+
+# Set working directory
+WORKDIR /home/node
+
+# Install n8n globally
+RUN npm install -g n8n
+
+# Switch back to root to install Python packages
+USER root
 
 # Install Python libraries with --break-system-packages flag (required for Alpine)
-# edge-tts: AI voice generation
-# requests: HTTP client for Pexels API  
-# yt-dlp: Video downloader (backup method)
 RUN pip3 install --break-system-packages --no-cache-dir \
     edge-tts \
     requests \
     yt-dlp
 
-# Create output and temp directories with proper permissions
-RUN mkdir -p /home/node/output /home/node/temp && \
-    chown -R node:node /home/node/output /home/node/temp
+# Copy the Python script
+COPY --chown=node:node shorts_maker.py /home/node/shorts_maker.py
+RUN chmod +x /home/node/shorts_maker.py
 
-# Copy the Python script into the image
-COPY shorts_maker.py /home/node/shorts_maker.py
-
-# Set proper permissions for the script
-RUN chmod +x /home/node/shorts_maker.py && \
-    chown node:node /home/node/shorts_maker.py
-
-# Switch back to node user for security
+# Switch back to node user
 USER node
 
-# Set working directory
-WORKDIR /home/node
+# Expose n8n port
+EXPOSE 5678
+
+# Use tini as entrypoint for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Start n8n
+CMD ["n8n"]
