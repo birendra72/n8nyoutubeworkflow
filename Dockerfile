@@ -5,12 +5,15 @@ FROM n8nio/n8n:latest
 USER root
 
 # Install Python3, pip, and FFmpeg (The "Video Engine" tools)
-RUN apk add --update --no-cache python3 py3-pip ffmpeg
+# Update package list and install dependencies for Debian-based image
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install the Python libraries we need (Edge-TTS and Requests)
-# We use --break-system-packages because Alpine manages python differently now, 
-# this is safe for a container.
-RUN pip3 install edge-tts requests --break-system-packages
+RUN pip3 install --no-cache-dir edge-tts requests
 
 # Copy your python script directly into the image
 # (Upload shorts_maker.py to your GitHub repo first!)
