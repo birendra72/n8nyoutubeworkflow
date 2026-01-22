@@ -30,17 +30,14 @@ RUN addgroup -g 1000 node && \
     mkdir -p /home/node/.n8n /home/node/output /home/node/temp && \
     chown -R node:node /home/node
 
-# Switch to node user
-USER node
-
-# Set working directory
-WORKDIR /home/node
-
-# Install n8n globally
+# Install n8n globally (as root, before switching users)
 RUN npm install -g n8n
 
-# Switch back to root to install Python packages
-USER root
+# Install Python libraries with --break-system-packages flag (required for Alpine)
+RUN pip3 install --break-system-packages --no-cache-dir \
+    edge-tts \
+    requests \
+    yt-dlp
 
 # Install Python libraries with --break-system-packages flag (required for Alpine)
 RUN pip3 install --break-system-packages --no-cache-dir \
