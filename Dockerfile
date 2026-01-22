@@ -1,5 +1,5 @@
-# Use latest stable Alpine as base (lightweight, low memory)
-FROM alpine:3.19
+# Use Node.js 20 on Alpine (provides Node.js >= 20.19)
+FROM node:20-alpine
 
 # Set environment variables for n8n
 ENV N8N_VERSION=latest \
@@ -8,14 +8,8 @@ ENV N8N_VERSION=latest \
     GENERIC_TIMEZONE=UTC
 
 # Install system dependencies
-# - nodejs and npm: For running n8n
-# - python3, py3-pip: For our automation script
-# - ffmpeg: For video processing
-# - git, bash: For compatibility
-# - tini: For proper signal handling
+# Note: nodejs and npm already included in node:alpine base
 RUN apk add --update --no-cache \
-    nodejs \
-    npm \
     python3 \
     py3-pip \
     ffmpeg \
@@ -24,20 +18,12 @@ RUN apk add --update --no-cache \
     tini \
     ca-certificates
 
-# Create node user and directories
-RUN addgroup -g 1000 node && \
-    adduser -u 1000 -G node -s /bin/sh -D node && \
-    mkdir -p /home/node/.n8n /home/node/output /home/node/temp && \
+# Create directories (node user already exists in node:alpine)
+RUN mkdir -p /home/node/.n8n /home/node/output /home/node/temp && \
     chown -R node:node /home/node
 
 # Install n8n globally (as root, before switching users)
 RUN npm install -g n8n
-
-# Install Python libraries with --break-system-packages flag (required for Alpine)
-RUN pip3 install --break-system-packages --no-cache-dir \
-    edge-tts \
-    requests \
-    yt-dlp
 
 # Install Python libraries with --break-system-packages flag (required for Alpine)
 RUN pip3 install --break-system-packages --no-cache-dir \
