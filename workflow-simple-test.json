@@ -1,0 +1,166 @@
+{
+    "name": "YouTube Shorts - Simple Test",
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "manual-trigger",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "typeVersion": 1,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "script-text",
+                            "name": "script",
+                            "value": "Welcome to today's motivational moment. Remember, success is not final, failure is not fatal. It is the courage to continue that counts. Keep pushing forward!",
+                            "type": "string"
+                        },
+                        {
+                            "id": "search-term",
+                            "name": "search_term",
+                            "value": "nature mountains",
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "id": "set-input",
+            "name": "Set Input Data",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "command": "python3",
+                "arguments": "/home/node/shorts_maker.py\n={{ $json.script }}\n={{ $json.search_term }}"
+            },
+            "id": "generate-video",
+            "name": "Generate Video",
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                680,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "fileSelector": "={{ $json.stdout.trim() }}"
+            },
+            "id": "read-video",
+            "name": "Read Video File",
+            "type": "n8n-nodes-base.readBinaryFile",
+            "typeVersion": 1,
+            "position": [
+                900,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "video-path",
+                            "name": "video_path",
+                            "value": "={{ $('Generate Video').item.json.stdout.trim() }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "status",
+                            "name": "status",
+                            "value": "success",
+                            "type": "string"
+                        },
+                        {
+                            "id": "script-used",
+                            "name": "script",
+                            "value": "={{ $('Set Input Data').item.json.script }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "search-used",
+                            "name": "search_term",
+                            "value": "={{ $('Set Input Data').item.json.search_term }}",
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "id": "output-summary",
+            "name": "Output Summary",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                1120,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Manual Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Set Input Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Set Input Data": {
+            "main": [
+                [
+                    {
+                        "node": "Generate Video",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Generate Video": {
+            "main": [
+                [
+                    {
+                        "node": "Read Video File",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read Video File": {
+            "main": [
+                [
+                    {
+                        "node": "Output Summary",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "staticData": null,
+    "tags": [],
+    "triggerCount": 0,
+    "updatedAt": "2026-01-22T17:30:00.000Z",
+    "versionId": "1"
+}
