@@ -44,9 +44,12 @@ Automate YouTube Shorts creation with AI voice narration and background videos u
    N8N_BASIC_AUTH_ACTIVE=true
    N8N_BASIC_AUTH_USER=admin
    N8N_BASIC_AUTH_PASSWORD=YourSecurePassword123!
+   N8N_RUNNERS_DISABLED=true
    PEXELS_API_KEY=your_pexels_api_key_here
    WEBHOOK_URL=https://your-app-name.onrender.com
    ```
+   
+   > **CRITICAL:** `N8N_RUNNERS_DISABLED=true` is required to allow Execute Command to run Python scripts without virtual environment.
    
    **Optional Variables (Recommended):**
    ```
