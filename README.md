@@ -1,6 +1,6 @@
 # n8n YouTube Shorts Automation 🎥
 
-Automate YouTube Shorts creation with AI voice narration and background videos using n8n workflows on Render's free tier.
+Automate YouTube Shorts creation with AI voice narration and background videos using n8n workflows on Render's free tier with persistent PostgreSQL storage.
 
 ## 🌟 Features
 
@@ -8,17 +8,55 @@ Automate YouTube Shorts creation with AI voice narration and background videos u
 - **AI Voice Generation** using Microsoft Edge TTS
 - **Automated Video Creation** with background footage
 - **Free Deployment** on Render
+- **Persistent Storage** via Neon.tech PostgreSQL (Free)
 - **Scheduled Automation** via n8n workflows
 
 ## 📋 Prerequisites
 
 - GitHub account (to host this repository)
 - [Render](https://render.com) account (free tier)
+- [Neon.tech](https://neon.tech) account (free PostgreSQL database)
 - [Pexels API Key](https://www.pexels.com/api/) (free, for stock videos)
 
-## 🚀 Quick Start
+---
 
-### Step 1: Deploy to Render
+## 🚀 Quick Start Guide
+
+### Phase 1: Set Up Free PostgreSQL Database (Neon.tech)
+
+> **Why Do We Use Neon.tech PostgreSQL?**  
+> Render's free tier **goes to sleep after 15 minutes of inactivity**. When it wakes up or restarts, it uses "Ephemeral Storage" - meaning all data stored locally (workflows, credentials, settings) gets wiped clean, like a hotel room reset after checkout.  
+>   
+> By using **Neon.tech's free PostgreSQL database**, we store all n8n data externally. So even when Render sleeps and wakes up, your workflows and API credentials remain intact because they're safely stored in the cloud database, not on Render's temporary storage.
+
+1. Go to **[Neon.tech](https://neon.tech)** and click **Sign Up**
+   - You can use your GitHub or Google account
+
+2. Create a **New Project**:
+   - **Name:** `n8n-memory` (or any name you prefer)
+   - **Region:** Choose the one closest to you (e.g., US East, Europe)
+   - **Version:** Default (Postgres 15 or 16)
+
+3. **Copy the Connection Details**:
+   - Neon will show you a "Connection String" that looks like this:
+     ```
+     postgres://alex:AbCd123@ep-shiny-rain-123456.us-east-2.aws.neon.tech/neondb?sslmode=require
+     ```
+   - **Do NOT close this tab yet** - you'll need to extract values from this string
+
+4. **Extract Database Credentials** from the connection string:
+   - **Host:** The part after `@` and before `/`
+     - Example: `ep-shiny-rain-123456.us-east-2.aws.neon.tech`
+   - **User:** The part after `//` and before `:`
+     - Example: `alex`
+   - **Password:** The part after `:` and before `@`
+     - Example: `AbCd123`
+   - **Database:** The part after `/` and before `?`
+     - Example: `neondb`
+
+---
+
+### Phase 2: Deploy to Render
 
 1. **Fork or Clone this Repository** to your GitHub account
 
@@ -37,51 +75,98 @@ Automate YouTube Shorts creation with AI voice narration and background videos u
    - **Runtime:** Docker (auto-detected from Dockerfile)
    - **Instance Type:** Free
 
-7. **Environment Variables** (Add these in Render):
-   
-   **Required Variables:**
+7. **Environment Variables** - Add ALL of these in Render's Environment tab:
+
+   #### **Basic n8n Configuration:**
    ```
    N8N_BASIC_AUTH_ACTIVE=true
    N8N_BASIC_AUTH_USER=admin
    N8N_BASIC_AUTH_PASSWORD=YourSecurePassword123!
    N8N_RUNNERS_DISABLED=true
+   ```
+
+   #### **PostgreSQL Database Configuration:**
+   > Use the values extracted from your Neon connection string
+   
+   | Variable Name | Value | Example |
+   |---------------|-------|---------|
+   | `DB_TYPE` | `postgresdb` | Required |
+   | `DB_POSTGRESDB_HOST` | Your Neon host | `ep-shiny-rain-123456.us-east-2.aws.neon.tech` |
+   | `DB_POSTGRESDB_PORT` | `5432` | Default PostgreSQL port |
+   | `DB_POSTGRESDB_DATABASE` | Your database name | `neondb` |
+   | `DB_POSTGRESDB_USER` | Your database user | `alex` |
+   | `DB_POSTGRESDB_PASSWORD` | Your database password | `AbCd123` |
+   | `DB_POSTGRESDB_SSL_ALLOW_SELF_SIGNED` | `true` | Required for Neon SSL |
+
+   #### **Encryption Key (CRITICAL):**
+   > ⚠️ **IMPORTANT:** This key encrypts your API credentials. Write it down and keep it safe!
+   
+   ```
+   N8N_ENCRYPTION_KEY=s0m3_v3ry_l0ng_r4nd0m_p4ssw0rd_h3r3
+   ```
+   - Make up a long random string (at least 24 characters)
+   - **Write this down** - if you move n8n to a new server, you'll need this exact key
+
+   #### **API Keys & Configuration:**
+   ```
    PEXELS_API_KEY=your_pexels_api_key_here
    WEBHOOK_URL=https://your-app-name.onrender.com
-   ```
-   
-   > **CRITICAL:** `N8N_RUNNERS_DISABLED=true` is required to allow Execute Command to run Python scripts without virtual environment.
-   
-   **Optional Variables (Recommended):**
-   ```
    GENERIC_TIMEZONE=Asia/Kolkata
    EXECUTIONS_TIMEOUT=3600
    N8N_CONCURRENCY_PRODUCTION_LIMIT=1
    ```
-   
+
    > **Get Your Pexels API Key:**
    > 1. Go to https://www.pexels.com/api/
    > 2. Sign up for free
    > 3. Copy your API key
-   > 4. Paste it in Render's environment variables
 
-8. Click **Create Web Service**
+8. Click **"Save Changes"** in the Environment tab
 
-9. Wait for deployment (first build takes 5-10 minutes)
+9. Click **"Create Web Service"** (or "Manual Deploy" if already created)
 
-### Step 2: Access n8n
+10. Wait for deployment (first build takes 5-10 minutes)
 
-1. Once deployed, your n8n instance will be available at:
+---
+
+### Phase 3: First-Time Setup & Verification
+
+1. Once deployment is complete, open your n8n URL:
    ```
    https://your-app-name.onrender.com
    ```
 
-2. Log in with the credentials you set in environment variables
+2. **Create Owner Account** (First Time Only):
+   - You'll be asked to create an account
+   - This is normal when switching from SQLite to PostgreSQL
+   - Create your account credentials
 
-### Step 3: Create Your First Workflow
+3. **Test Persistence**:
+   - Create a simple workflow
+   - Go to Render → Click **"Restart Service"**
+   - Wait for restart (2-3 minutes)
+   - Open your n8n URL again
+   - **Your workflow should still be there!** 🎉
 
-1. In n8n, create a new workflow
+---
 
-2. Add the following nodes:
+## 🎬 Creating Your First Workflow
+
+### Option 1: Import Pre-Built Workflow (Recommended)
+
+1. Download one of the workflow JSON files from this repository:
+   - `workflow-simple-test.json` - Basic test workflow
+   - `workflow-automated-trends.json` - Advanced daily automation
+
+2. In n8n, click **"+"** → **"Import from File"**
+
+3. Select the downloaded JSON file
+
+4. Configure any API credentials if needed
+
+5. Activate the workflow
+
+### Option 2: Build From Scratch
 
 #### **Node 1: Schedule Trigger**
 - **Trigger:** Cron
@@ -118,9 +203,9 @@ Automate YouTube Shorts creation with AI voice narration and background videos u
 - Use the HTTP Request node or YouTube API node
 - Configure with your YouTube API credentials
 
-3. **Activate** the workflow
+---
 
-## 🎬 How It Works
+## 🛠️ How It Works
 
 1. **Scheduled Trigger** fires at your specified time
 2. **Script Data** defines the narration text and video search term
@@ -131,8 +216,11 @@ Automate YouTube Shorts creation with AI voice narration and background videos u
    - Outputs final video to `/tmp/final_short.mp4`
 4. **Read Binary File** loads the generated video
 5. **Upload** (optional) to YouTube or other platforms
+6. **PostgreSQL** saves your workflow configuration permanently
 
-## 🛠️ Customization
+---
+
+## 🎨 Customization
 
 ### Change AI Voice
 
@@ -152,25 +240,59 @@ Edit `shorts_maker.py` line 99:
 
 ### Video Quality
 
-Edit FFmpeg parameters in `shorts_maker.py` line 100-101 for resolution/bitrate
+Edit FFmpeg parameters in `shorts_maker.py` for resolution/bitrate adjustments
+
+### Schedule Times
+
+Edit the Cron expression in the Schedule Trigger node:
+- Daily at 8 AM: `0 8 * * *`
+- Every 2 hours: `0 */2 * * *`
+- Twice daily (8 AM & 8 PM): `0 8,20 * * *`
+
+---
 
 ## ⚠️ Important Notes
 
 ### Render Free Tier Limitations
 
 - **Sleep After 15 Minutes:** Your n8n instance will sleep if inactive
-- **Solution:** Use [UptimeRobot](https://uptimerobot.com) (free) to ping your n8n health endpoint every 10 minutes:
+- **Solution:** Use [UptimeRobot](https://uptimerobot.com) (free) to ping your instance every 10 minutes:
   ```
   https://your-app-name.onrender.com/healthz
   ```
 
-### Storage
+### Storage Behavior
 
-- Render's free tier has ephemeral storage
-- Generated videos are stored in `/tmp` and will be lost on restart
+- **Workflows, Credentials, Settings:** Stored permanently in Neon PostgreSQL ✅
+- **Generated Videos:** Stored in `/tmp` (ephemeral) - Will be deleted on restart ⚠️
 - **Solution:** Always upload/download videos within the same workflow execution
 
+### Encryption Key Security
+
+- **Never lose your `N8N_ENCRYPTION_KEY`** - Without it, you cannot decrypt saved credentials
+- Store it securely (password manager, secure notes, etc.)
+- If you migrate to a new server, you need this exact key
+
+---
+
 ## 🐛 Troubleshooting
+
+### "Database connection failed"
+
+❌ **Problem:** Incorrect PostgreSQL credentials
+
+✅ **Solution:**
+- Double-check all `DB_POSTGRESDB_*` values match your Neon connection string
+- Ensure `DB_POSTGRESDB_SSL_ALLOW_SELF_SIGNED=true` is set
+- Check Neon project is active and not paused
+
+### "Workflows disappear after restart"
+
+❌ **Problem:** Not using PostgreSQL (still using SQLite)
+
+✅ **Solution:**
+- Verify `DB_TYPE=postgresdb` is set in Render environment
+- Redeploy the service after adding DB variables
 
 ### "python3: command not found"
 
@@ -198,18 +320,42 @@ Edit FFmpeg parameters in `shorts_maker.py` line 100-101 for resolution/bitrate
 
 ✅ **Solution:** Set up UptimeRobot to keep your instance awake
 
+### "Virtual environment is missing"
+
+❌ **Problem:** `N8N_RUNNERS_DISABLED` not set
+
+✅ **Solution:**
+- Add `N8N_RUNNERS_DISABLED=true` to Render environment
+- Redeploy the service
+
+---
+
 ## 📚 Resources
 
 - [n8n Documentation](https://docs.n8n.io/)
 - [Render Documentation](https://render.com/docs)
+- [Neon.tech Documentation](https://neon.tech/docs)
 - [Pexels API Docs](https://www.pexels.com/api/documentation/)
 - [Edge-TTS Voices](https://github.com/rany2/edge-tts)
 - [FFmpeg Documentation](https://ffmpeg.org/documentation.html)
 
-## 📺 Video Tutorial
+---
 
-For a step-by-step visual guide on deploying custom Docker apps on Render:
-- [Deploy n8n with FFmpeg on Render](https://www.youtube.com/watch?v=ciDzX398pl0)
+## 🎓 YouTube API Setup (For Automated Uploads)
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project
+3. Enable **YouTube Data API v3**
+4. Create **OAuth 2.0 credentials**
+5. Add authorized redirect URI: `https://your-app.onrender.com/rest/oauth2-credential/callback`
+6. In n8n:
+   - Settings → Credentials → Add Credential
+   - Select "YouTube OAuth2 API"
+   - Enter Client ID and Client Secret
+   - Click "Connect my account"
+   - Authorize access
+
+---
 
 ## 📝 License
 
