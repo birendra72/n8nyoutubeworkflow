@@ -8,6 +8,7 @@ __pycache__/
 dist/
 build/
 youtubeworkflow.json
+YouTubeBot.json
 # Virtual Environment
 venv/
 env/
