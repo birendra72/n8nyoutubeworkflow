@@ -1,36 +1,15 @@
-# Use official n8n image as base (already includes Node.js and n8n)
+# Use official n8n image - pure n8n setup for workflow orchestration
 FROM n8nio/n8n:latest
 
-# Switch to root to install additional packages
-USER root
+# No additional dependencies needed - this is a pure n8n instance
+# All UI features (Share, Activate, Save) will be available
+# Python processing can be handled via Hugging Face Spaces or other services
 
-# Install system dependencies for Python and FFmpeg
-# Keep it minimal - only what's needed for your workflow
-RUN apk add --update --no-cache \
-    python3 \
-    py3-pip \
-    ffmpeg \
-    ca-certificates
+# The official n8n image already includes:
+# - n8n with all features enabled
+# - Node.js runtime
+# - All standard n8n nodes
+# - Proper entrypoint and configuration
+# - Port 5678 exposed
 
-# Install Python libraries with --break-system-packages flag (required for Alpine)
-RUN pip3 install --break-system-packages --no-cache-dir \
-    edge-tts \
-    requests \
-    yt-dlp
-
-# Create necessary directories and set permissions
-RUN mkdir -p /home/node/output /home/node/temp && \
-    chown -R node:node /home/node
-
-# Copy the Python script
-COPY --chown=node:node shorts_maker.py /home/node/shorts_maker.py
-RUN chmod +x /home/node/shorts_maker.py
-
-# Switch back to node user for security
-USER node
-
-# The official n8n image already handles:
-# - N8N_USER_FOLDER=/home/node/.n8n
-# - EXPOSE 5678
-# - Proper entrypoint and CMD
-# So we don't need to redefine them
+# Just use the base image as-is for maximum compatibility
