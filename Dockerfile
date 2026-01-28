@@ -1,29 +1,16 @@
-# Use Node.js 20 on Alpine (provides Node.js >= 20.19)
-FROM node:20-alpine
+# Use official n8n image as base (already includes Node.js and n8n)
+FROM n8nio/n8n:latest
 
-# Set environment variables for n8n
-ENV N8N_VERSION=latest \
-    NODE_ENV=production \
-    N8N_USER_FOLDER=/home/node/.n8n \
-    GENERIC_TIMEZONE=UTC
+# Switch to root to install additional packages
+USER root
 
-# Install system dependencies
-# Note: nodejs and npm already included in node:alpine base
+# Install system dependencies for Python and FFmpeg
+# Keep it minimal - only what's needed for your workflow
 RUN apk add --update --no-cache \
     python3 \
     py3-pip \
     ffmpeg \
-    git \
-    bash \
-    tini \
     ca-certificates
-
-# Create directories (node user already exists in node:alpine)
-RUN mkdir -p /home/node/.n8n /home/node/output /home/node/temp && \
-    chown -R node:node /home/node
-
-# Install n8n globally (as root, before switching users)
-RUN npm install -g n8n
 
 # Install Python libraries with --break-system-packages flag (required for Alpine)
 RUN pip3 install --break-system-packages --no-cache-dir \
@@ -31,18 +18,19 @@ RUN pip3 install --break-system-packages --no-cache-dir \
     requests \
     yt-dlp
 
+# Create necessary directories and set permissions
+RUN mkdir -p /home/node/output /home/node/temp && \
+    chown -R node:node /home/node
+
 # Copy the Python script
 COPY --chown=node:node shorts_maker.py /home/node/shorts_maker.py
 RUN chmod +x /home/node/shorts_maker.py
 
-# Switch back to node user
+# Switch back to node user for security
 USER node
 
-# Expose n8n port
-EXPOSE 5678
-
-# Use tini as entrypoint for proper signal handling
-ENTRYPOINT ["/sbin/tini", "--"]
-
-# Start n8n
-CMD ["n8n"]
+# The official n8n image already handles:
+# - N8N_USER_FOLDER=/home/node/.n8n
+# - EXPOSE 5678
+# - Proper entrypoint and CMD
+# So we don't need to redefine them

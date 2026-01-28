@@ -1,0 +1,373 @@
+{
+  "name": "YouTubeBot",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en",
+        "options": {}
+      },
+      "id": "4d13e7ec-dfe2-486d-a348-9dbcf4d945aa",
+      "name": "Get Google News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -1328,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "59ecfd1c-f1ac-4efb-80a2-b45ffab37fbb",
+      "name": "Parse RSS XML",
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "rss.channel.item",
+        "options": {}
+      },
+      "id": "2acf48e0-6109-4630-b45e-a902f3c3259b",
+      "name": "Split News Items",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [
+        -880,
+        144
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "9fa7d700-b16f-47ac-a419-7c63d93a8fe7",
+      "name": "Pick Top Story",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        112
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1616,
+        -128
+      ],
+      "id": "900657f7-8a4d-45e0-ac4e-e607f23d13c3",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get content\nconst content = items[0].json.choices[0].message.content;\n\n// 2. Extract JSON\nlet jsonObject;\nconst jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n\nif (jsonMatch) {\n    try {\n        jsonObject = JSON.parse(jsonMatch[0]);\n    } catch (e) {\n        // Fallback Regex Extraction if JSON breaks\n        const scriptMatch = jsonMatch[0].match(/\"script\":\\s*\"([\\s\\S]*?)(?=\",)/);\n        const titleMatch = jsonMatch[0].match(/\"title\":\\s*\"([\\s\\S]*?)(?=\",)/);\n        const descMatch = jsonMatch[0].match(/\"description\":\\s*\"([\\s\\S]*?)(?=\",)/);\n        const tagsMatch = jsonMatch[0].match(/\"tags\":\\s*\"([\\s\\S]*?)(?=\",)/);\n        const searchMatch = jsonMatch[0].match(/\"search_term\":\\s*\"([\\s\\S]*?)\"/);\n        \n        jsonObject = {\n            script: scriptMatch ? scriptMatch[1] : \"Error extracting script\",\n            title: titleMatch ? titleMatch[1] : \"News Update\",\n            description: descMatch ? descMatch[1] : \"Check out this update.\",\n            tags: tagsMatch ? tagsMatch[1] : \"#News\",\n            search_term: searchMatch ? searchMatch[1] : \"Nature\"\n        };\n    }\n} else {\n    throw new Error(\"AI did not return valid JSON\");\n}\n\n// 3. SANITIZE SCRIPT (Only clean the spoken text)\nlet cleanScript = jsonObject.script\n    .replace(/\\\\n/g, \" \")\n    .replace(/\\*\\*.*?\\*\\*/g, \"\")\n    .replace(/\\[.*?\\]/g, \"\")\n    .replace(/\\(.*?\\)/g, \"\")\n    .replace(/Visual:/gi, \"\")\n    .replace(/Voiceover:/gi, \"\")\n    .replace(/\\n/g, \" \")\n    .replace(/\\s+/g, \" \")\n    .trim();\n\njsonObject.script = cleanScript;\n\nreturn { json: jsonObject };"
+      },
+      "id": "84206854-8112-4745-8a4d-39dc0f1c5070",
+      "name": "Clean AI Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.a4f.co/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer ddc-a4f-cea29a2a0e424a7b9e441304a62fb089"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Referer",
+              "value": "https://www.google.com/"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "provider-5/gemini-2.5-flash-lite"
+            },
+            {
+              "name": "=messages",
+              "value": "={{\n  [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a professional YouTube Shorts creator. TOPIC: \" + $('Pick Top Story').item.json.title + \". DETAILS: \" + $('Pick Top Story').item.json.description.replace(/<[^>]*>?/gm, '').replace(/\"/g, '\\\\\"') + \". \\n\\nTASK: Create a viral Shorts package. \\n1. script: 35 seconds spoken text (NO visual cues, NO scene directions, NO double quotes). \\n2. title: A clickbait-style title (under 60 chars) with 1 emoji. \\n3. description: A 2-sentence summary calling for a comment. \\n4. tags: 5 comma-separated hashtags. \\n5. search_term: A generic visual search term for stock video.\\n\\nRETURN JSON ONLY:\\n{ \\n  \\\"script\\\": \\\"...\\\", \\n  \\\"title\\\": \\\"...\\\", \\n  \\\"description\\\": \\\"...\\\", \\n  \\\"tags\\\": \\\"...\\\", \\n  \\\"search_term\\\": \\\"...\\\" \\n}\"\n    }\n  ]\n}}"
+            },
+            {
+              "name": "temperature",
+              "value": "0.7"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5bb25d09-9212-4731-9e75-fb0c8b195739",
+      "name": "A4F AI (Script)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -448,
+        64
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://birendrasingh72-n8n-video-engine.hf.space/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"script\": $('Clean AI Output').item.json.script, \"search_term\": $('Clean AI Output').item.json.search_term } }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        0,
+        48
+      ],
+      "id": "1e1ddbf7-ab22-4941-8b54-ad3e49c14438",
+      "name": "Generate Video (Hugging Face)"
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $('Clean AI Output').item.json.title }} #Shorts",
+        "regionCode": "IN",
+        "categoryId": "25",
+        "options": {
+          "description": "={{ $('Clean AI Output').item.json.description }}\n\n👇 Subscribe for more!\n\n{{ $('Clean AI Output').item.json.tags }}",
+          "privacyStatus": "private",
+          "selfDeclaredMadeForKids": false
+        }
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        224,
+        96
+      ],
+      "id": "835117da-af09-4b7b-822a-f3be7d7d05bc",
+      "name": "Upload a video",
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "aXMjevc312alfGm9",
+          "name": "YouTube account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtMinute": 17
+            }
+          ]
+        }
+      },
+      "id": "dc493ef2-13f6-40e6-8ecc-46ca6f675ae7",
+      "name": "Daily Trigger (4 AM)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1616,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "path": "91d30dd9-6007-4f5d-904e-2fbbf2b777ef",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1616,
+        -304
+      ],
+      "id": "d760cd0c-461d-4f92-93d7-ac50c40d58ed",
+      "name": "Webhook",
+      "webhookId": "91d30dd9-6007-4f5d-904e-2fbbf2b777ef",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5X0mdSFCrlkJW3uB",
+          "name": "Header Auth account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Google News": {
+      "main": [
+        [
+          {
+            "node": "Parse RSS XML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse RSS XML": {
+      "main": [
+        [
+          {
+            "node": "Split News Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split News Items": {
+      "main": [
+        [
+          {
+            "node": "Pick Top Story",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get Google News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Top Story": {
+      "main": [
+        [
+          {
+            "node": "A4F AI (Script)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A4F AI (Script)": {
+      "main": [
+        [
+          {
+            "node": "Clean AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean AI Output": {
+      "main": [
+        [
+          {
+            "node": "Generate Video (Hugging Face)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Video (Hugging Face)": {
+      "main": [
+        [
+          {
+            "node": "Upload a video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload a video": {
+      "main": [
+        []
+      ]
+    },
+    "Daily Trigger (4 AM)": {
+      "main": [
+        [
+          {
+            "node": "Get Google News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Google News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": -1
+  },
+  "versionId": "ae4ec472-b0d9-4f28-9cde-bbc64f74044d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "62d29ebdde1a9376808552ce73248c4d9d960cfbde9941c5aff34d1999d4cfce"
+  },
+  "id": "71gVDFcqsFk1dZ_foJn98",
+  "tags": []
+}

@@ -1,20 +1,30 @@
 # n8n YouTube Shorts Automation 🎥
 
-Automate YouTube Shorts creation with AI voice narration and background videos using n8n workflows on Render's free tier with persistent PostgreSQL storage.
+Automate YouTube Shorts creation with AI voice narration and background videos using n8n workflows on Render's free tier with persistent PostgreSQL storage and Hugging Face Spaces for video processing.
 
 ## 🌟 Features
 
 - **Custom n8n Docker Image** with Python and FFmpeg pre-installed
 - **AI Voice Generation** using Microsoft Edge TTS
 - **Automated Video Creation** with background footage
-- **Free Deployment** on Render
+- **Free Deployment** with Render (n8n) + Hugging Face Spaces (video engine)
 - **Persistent Storage** via Neon.tech PostgreSQL (Free)
 - **Scheduled Automation** via n8n workflows
+- **16GB RAM Video Processing** on Hugging Face Spaces (vs 512MB on Render)
+
+## 🏗️ Architecture
+
+This project uses a **split architecture** to overcome Render's RAM limitations:
+
+- **Render (n8n)**: Workflow orchestration, RSS parsing, AI script generation, scheduling
+- **Hugging Face Space**: Video generation (FFmpeg processing with 16GB RAM)
+- **Neon.tech**: Persistent PostgreSQL database for workflows and credentials
 
 ## 📋 Prerequisites
 
 - GitHub account (to host this repository)
 - [Render](https://render.com) account (free tier)
+- [Hugging Face](https://huggingface.co) account (free tier)
 - [Neon.tech](https://neon.tech) account (free PostgreSQL database)
 - [Pexels API Key](https://www.pexels.com/api/) (free, for stock videos)
 
@@ -56,7 +66,77 @@ Automate YouTube Shorts creation with AI voice narration and background videos u
 
 ---
 
-### Phase 2: Deploy to Render
+### Phase 2: Set Up Hugging Face Space (Video Engine)
+
+> **Why Use Hugging Face Spaces?**  
+> Render's free tier has only **512MB of RAM**, which is insufficient for FFmpeg video processing (requires 2GB+ RAM). The process gets killed (Error 137) when memory exceeds the limit.  
+>   
+> **Hugging Face Spaces** offers **16GB of RAM** on the free tier, perfect for video generation. We'll create a simple API endpoint that n8n can call to generate videos.
+
+1. **Create a New Space:**
+   - Go to [Hugging Face Spaces](https://huggingface.co/new-space)
+   - Click **"Create new Space"**
+   - **Name:** `n8n-video-engine` (or any name)
+   - **SDK:** Docker
+   - **Hardware:** CPU basic (free)
+   - **Visibility:** Public or Private (your choice)
+   - Click **"Create Space"**
+
+2. **Clone Your Space Repository:**
+   
+   ```powershell
+   # Clone the Space (use your Hugging Face username)
+   git clone https://huggingface.co/spaces/YOUR-USERNAME/n8n-video-engine
+   cd n8n-video-engine
+   ```
+
+3. **Copy Hugging Face Files:**
+   
+   From this repository's `huggingface/` folder, copy these files to your Space:
+   - `Dockerfile`
+   - `requirements.txt`
+   - `app.py`
+   - `README.md`
+
+   ```powershell
+   # Example (adjust paths as needed)
+   cp ../n8nyoutubeworkflow/huggingface/* .
+   ```
+
+4. **Push to Hugging Face:**
+   
+   ```powershell
+   git add .
+   git commit -m "Initial video generation service"
+   git push
+   ```
+   
+   > When prompted for credentials:
+   > - **Username:** Your Hugging Face username
+   > - **Password:** Use an [Access Token](https://huggingface.co/settings/tokens) with **WRITE** permissions
+
+5. **Configure the Pexels API Key:**
+   - Go to your Space page on Hugging Face
+   - Click **Settings** → **Variables and secrets**
+   - Click **"New secret"**
+   - **Name:** `PEXELS_API_KEY`
+   - **Value:** Your Pexels API key (from [pexels.com/api](https://www.pexels.com/api/))
+   - Click **"Save"**
+
+6. **Wait for Build:**
+   - The Space will build automatically (takes 2-3 minutes)
+   - Watch the build logs in the **"Logs"** tab
+   - Wait until status shows **"Running"** (green checkmark)
+
+7. **Get Your Space URL:**
+   - Once running, click the **three dots (⋯)** in the top right
+   - Select **"Embed this space"** → **"Direct URL"**
+   - Copy the URL (e.g., `https://yourname-n8n-video-engine.hf.space`)
+   - **Save this URL** - you'll need it for n8n configuration
+
+---
+
+### Phase 3: Deploy n8n to Render
 
 1. **Fork or Clone this Repository** to your GitHub account
 
@@ -150,73 +230,66 @@ Automate YouTube Shorts creation with AI voice narration and background videos u
 
 ---
 
-## 🎬 Creating Your First Workflow
+## 🎬 Setting Up Your Workflow
 
-### Option 1: Import Pre-Built Workflow (Recommended)
+### Import the Updated Workflow
 
-1. Download one of the workflow JSON files from this repository:
-   - `workflow-simple-test.json` - Basic test workflow
-   - `workflow-automated-trends.json` - Advanced daily automation
+1. **Update the Workflow JSON:**
+   - Open `Trend to Script (A4F Integrated - Full Pipeline).json` in a text editor
+   - Find the line with `"url": "https://YOUR-SPACE-NAME.hf.space/generate"`
+   - Replace `YOUR-SPACE-NAME` with your actual Hugging Face Space URL
+   - Save the file
 
-2. In n8n, click **"+"** → **"Import from File"**
+2. **Import to n8n:**
+   - In n8n, click **"+"** → **"Import from File"**
+   - Select the updated `Trend to Script (A4F Integrated - Full Pipeline).json`
+   - Click **"Import"**
 
-3. Select the downloaded JSON file
+3. **Verify the Workflow:**
+   - Check that "Generate Video (Hugging Face)" node shows your Space URL
+   - Ensure all nodes are connected properly
+   - Activate the workflow
 
-4. Configure any API credentials if needed
+### Test Your Setup
 
-5. Activate the workflow
-
-### Option 2: Build From Scratch
-
-#### **Node 1: Schedule Trigger**
-- **Trigger:** Cron
-- **Mode:** Every Day
-- **Hour:** 8
-- **Minute:** 0
-
-#### **Node 2: Set Script Data**
-- **Node Type:** Set
-- **Values:**
-  ```json
-  {
-    "script": "Welcome to today's motivational tip. Success is not final, failure is not fatal. It is the courage to continue that counts.",
-    "search_term": "nature landscape"
-  }
-  ```
-
-#### **Node 3: Execute Command**
-- **Node Type:** Execute Command
-- **Command:** `python3`
-- **Arguments:**
-  ```
-  /home/node/shorts_maker.py
-  {{ $json.script }}
-  {{ $json.search_term }}
-  ```
-
-#### **Node 4: Read Video File**
-- **Node Type:** Read Binary File
-- **File Path:** `/tmp/final_short.mp4`
-- **Property Name:** `video`
-
-#### **Node 5: Upload to YouTube** (Optional)
-- Use the HTTP Request node or YouTube API node
-- Configure with your YouTube API credentials
+1. Click the **"When clicking 'Execute workflow'"** (manual trigger) node
+2. Click **"Test workflow"**
+3. Watch the execution:
+   - ✅ Daily Trigger → Get Google News → Parse RSS → Split Items → Pick Top Story
+   - ✅ A4F AI (Script) → Clean AI Output
+   - ✅ Generate Video (Hugging Face) → Convert to Binary → Read Video File
+4. Check the final output - you should have a `.mp4` file!
 
 ---
 
 ## 🛠️ How It Works
 
-1. **Scheduled Trigger** fires at your specified time
-2. **Script Data** defines the narration text and video search term
-3. **Execute Command** runs the Python script that:
-   - Generates AI voice using Edge-TTS
-   - Downloads background video from Pexels
-   - Combines audio + video with FFmpeg
-   - Outputs final video to `/tmp/final_short.mp4`
-4. **Read Binary File** loads the generated video
-5. **Upload** (optional) to YouTube or other platforms
-6. **PostgreSQL** saves your workflow configuration permanently
+### The Complete Pipeline
+
+1. **n8n on Render** (Workflow Manager):
+   - **Schedule Trigger** fires daily at 8 AM
+   - **Get Google News** fetches trending topics via RSS
+   - **Parse RSS XML** converts XML to JSON
+   - **Split News Items** separates individual stories
+   - **Pick Top Story** selects the most recent article
+   - **A4F AI (Script)** generates a 35-second YouTube Shorts script using Gemini
+   - **Clean AI Output** extracts the JSON (script + search term)
+
+2. **Hugging Face Space** (Video Engine):
+   - **Generate Video** endpoint receives script and search term via HTTP POST
+   - Downloads AI voice using Edge-TTS
+   - Fetches portrait video from Pexels API
+   - Combines audio + video + subtitles with FFmpeg
+   - Returns the final MP4 video file
+
+3. **Back to n8n**:
+   - **Convert to Binary** processes the video file
+   - **Read Video File** loads the binary data
+   - *(Optional)* Upload to YouTube or other platforms
+
+4. **Neon PostgreSQL**:
+   - Saves all workflow configurations permanently
+   - Stores credentials securely (encrypted)
 
 ---
 
@@ -224,27 +297,26 @@ Automate YouTube Shorts creation with AI voice narration and background videos u
 
 ### Change AI Voice
 
-Edit `shorts_maker.py` line 17:
+Edit `huggingface/app.py` line 44:
 ```python
-voice = "en-US-AriaNeural"  # Try: en-GB-SoniaNeural, en-AU-NatashaNeural, etc.
+communicate = edge_tts.Communicate(text, "en-US-AriaNeural")  # Try different voices
 ```
 
 [Full list of voices](https://speech.microsoft.com/portal/voicegallery)
 
-### Video Duration
+> **Note:** After changing the Space files, commit and push to Hugging Face to rebuild the Space.
 
-Edit `shorts_maker.py` line 99:
+### Change Video Quality
+
+Edit `huggingface/app.py` around line 133:
 ```python
-'-t', '60',  # Change to desired duration (max 60 for Shorts)
+"-preset", "medium",  # Options: ultrafast, fast, medium, slow
+"-crf", "20",         # Lower = better quality (18-28 range)
 ```
-
-### Video Quality
-
-Edit FFmpeg parameters in `shorts_maker.py` for resolution/bitrate adjustments
 
 ### Schedule Times
 
-Edit the Cron expression in the Schedule Trigger node:
+Edit the Cron expression in the "Daily Trigger (8 AM)" node in n8n:
 - Daily at 8 AM: `0 8 * * *`
 - Every 2 hours: `0 */2 * * *`
 - Twice daily (8 AM & 8 PM): `0 8,20 * * *`
@@ -253,19 +325,25 @@ Edit the Cron expression in the Schedule Trigger node:
 
 ## ⚠️ Important Notes
 
-### Render Free Tier Limitations
+### Free Tier Limitations
 
+**Render:**
 - **Sleep After 15 Minutes:** Your n8n instance will sleep if inactive
-- **Solution:** Use [UptimeRobot](https://uptimerobot.com) (free) to ping your instance every 10 minutes:
+- **Solution:** Use [UptimeRobot](https://uptimerobot.com) (free) to ping every 10 minutes:
   ```
   https://your-app-name.onrender.com/healthz
   ```
 
+**Hugging Face Spaces:**
+- **Sleep Policy:** Spaces sleep after 48 hours of inactivity
+- **Wake-up Time:** ~30 seconds on first request (cold start)
+- **Concurrent Requests:** 1 video at a time on free tier
+
 ### Storage Behavior
 
-- **Workflows, Credentials, Settings:** Stored permanently in Neon PostgreSQL ✅
-- **Generated Videos:** Stored in `/tmp` (ephemeral) - Will be deleted on restart ⚠️
-- **Solution:** Always upload/download videos within the same workflow execution
+- **Workflows & Credentials:** Stored permanently in Neon PostgreSQL ✅
+- **Generated Videos in Hugging Face:** Stored in `/app/output` (ephemeral) ⚠️
+- **Solution:** Always download/upload videos within the same workflow execution
 
 ### Encryption Key Security
 
@@ -294,29 +372,36 @@ Edit the Cron expression in the Schedule Trigger node:
 - Verify `DB_TYPE=postgresdb` is set in Render environment
 - Redeploy the service after adding DB variables
 
-### "python3: command not found"
+### "Connection refused to Hugging Face Space"
 
-❌ **Problem:** Using standard n8n image instead of custom one
+❌ **Problem:** Space is sleeping or not yet built
 
-✅ **Solution:** Make sure you deployed from **this GitHub repository**, not from Docker Hub
+✅ **Solution:**
+- Check your Space status - it should show "Running"
+- Visit the Space URL in a browser to wake it up
+- Wait 30 seconds for cold start, then retry
 
-### FFmpeg Errors
+### "PEXELS_API_KEY not set" error from Hugging Face
 
-❌ **Problem:** Video dimensions or codec issues
+❌ **Problem:** Secret not configured in Space
 
-✅ **Solution:** Check the background video format. The script expects MP4. Modify FFmpeg parameters if needed.
+✅ **Solution:**
+- Go to Space Settings → Variables and secrets
+- Verify the secret is named exactly `PEXELS_API_KEY`
+- Restart the Space after adding the secret
 
-### No Videos Found
+### "500 Error" from Hugging Face endpoint
 
-❌ **Problem:** Pexels API key not set or invalid search term
+❌ **Problem:** FFmpeg error or API issue
 
-✅ **Solution:** 
-- Verify `PEXELS_API_KEY` is set in Render environment variables
-- Try different search terms (e.g., "ocean", "city", "mountains")
+✅ **Solution:**
+- Check the Space **Logs** tab for specific error messages
+- Try a different search term (more generic like "ocean", "city")
+- Verify Pexels API key is valid
 
 ### Workflow Not Triggering
 
-❌ **Problem:** Instance is asleep
+❌ **Problem:** n8n instance is asleep
 
 ✅ **Solution:** Set up UptimeRobot to keep your instance awake
 
